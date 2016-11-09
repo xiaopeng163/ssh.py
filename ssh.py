@@ -25,9 +25,12 @@ import os
 import re
 import shlex
 import sys
+import abc
+import six
 
 from cliff.app import App
 from cliff.lister import Lister
+from cliff import command
 from cliff.commandmanager import CommandManager
 
 HOME_PATH = os.path.expanduser("~")
@@ -153,37 +156,56 @@ class SSHKeyManager(object):
         pass
 
 
-class ListCommand(Lister):
-    """Show a list of files in the current directory.
-    The file name and size are printed by default.
-    """
+class SSHCommandMeta(abc.ABCMeta):
+    def __new__(cls, name, bases, cls_dict):
+        if 'log' not in cls_dict:
+            cls_dict['log'] = logging.getLogger(
+                cls_dict['__module__'] + '.' + name)
+        return super(SSHCommandMeta, cls).__new__(cls, name, bases, cls_dict)
 
-    log = logging.getLogger(__name__)
+
+@six.add_metaclass(SSHCommandMeta)
+class SSHCommand(command.Command):
+
+    def run(self, parsed_args):
+        self.log.debug('Run command(%s)', parsed_args)
+        return super(SSHCommand, self).run(parsed_args)
+
+
+class ListHostCommand(SSHCommand, Lister):
+    """Show a list of SSH Host in the ~/.ssh/config file.
+    """
+    list_columns = ['host', 'hostname', 'user', 'identityfile']
 
     def get_parser(self, prog_name):
-        parser = super(ListCommand, self).get_parser(prog_name)
-        parser.add_argument('object', nargs='?', default='key', help='the object will list: key or host')
+        parser = super(ListHostCommand, self).get_parser(prog_name)
+        # TODO(xiaoquwl) add more prameters
         return parser
 
     def take_action(self, parsed_args):
-        if parsed_args.object == 'key':
-            return (('Private Key Name',), ((key_name,) for key_name in SSHKeyManager.list()))
-        elif parsed_args.object == 'host':
-            ssh_config = SSHConfig().load()
-            header = ('host', 'hostname', 'user', 'identityfile')
-            return (
-                header,
-                ((
-                    config['host'],
-                    config['config'].get('hostname') or config['host'],
-                    config['config'].get('user'),
-                    config['config'].get('identityfile')) for config in ssh_config[1:]))
-        else:
-            self.log.error("only can list 'key' or 'host'")
-            sys.exit()
+        ssh_config = SSHConfig().load()
+        self.log.debug(parsed_args)
+        return (
+            self.list_columns,
+            ((
+                config['host'],
+                config['config'].get('hostname') or config['host'],
+                config['config'].get('user'),
+                config['config'].get('identityfile')) for config in ssh_config[1:]))
+
+
+class ListKeyCommand(SSHCommand, Lister):
+    """List the SSH keys in ~/.ssh/ folder
+    """
+    list_columns = ['Private Key Name', ]
+
+    def take_action(self, parsed_args):
+        return (('Private Key Name',), ((key_name,) for key_name in SSHKeyManager.list()))
 
 
 class SSHApp(App):
+
+    log = logging.getLogger(__name__)
 
     def __init__(self):
         command = CommandManager('sshapp.app')
@@ -194,21 +216,22 @@ class SSHApp(App):
             deferred_help=True,
             )
         commands = {
-            'list': ListCommand,
+            'list-host': ListHostCommand,
+            'list-key': ListKeyCommand
         }
         for k, v in commands.iteritems():
             command.add_command(k, v)
 
     def initialize_app(self, argv):
-        self.LOG.debug('initialize_app')
+        self.log.debug('Initialize_app')
 
     def prepare_to_run_command(self, cmd):
-        self.LOG.debug('prepare_to_run_command %s', cmd.__class__.__name__)
+        self.log.debug('Prepare to run command %s', cmd.__class__.__name__)
 
     def clean_up(self, cmd, result, err):
-        self.LOG.debug('clean_up %s', cmd.__class__.__name__)
+        self.log.debug('Clean_up %s', cmd.__class__.__name__)
         if err:
-            self.LOG.debug('got an error: %s', err)
+            self.log.debug('Got an error: %s', err)
 
 
 def main(argv=sys.argv[1:]):

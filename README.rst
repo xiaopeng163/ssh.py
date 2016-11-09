@@ -25,7 +25,7 @@ Get all SSH key in local host
 
 .. code-block:: bash
 
-  $ python ssh.py list key
+  $ python ssh.py list-key
   +-----------------------+
   | Private Key Name      |
   +-----------------------+
@@ -41,7 +41,7 @@ Get all SSH host config information
 
 .. code-block:: bash
 
-  (ssh.py)➜  ssh.py git:(master) ✗ python ssh.py list host
+  (ssh.py)➜  ssh.py git:(master) ✗ python ssh.py list-host
   +-------------------------+----------------------------------------------------+-------------+----------------------------------+
   | host                    | hostname                                           | user        | identityfile                     |
   +-------------------------+----------------------------------------------------+-------------+----------------------------------+
