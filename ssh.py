@@ -29,7 +29,8 @@ import abc
 import six
 
 from cliff.app import App
-from cliff.lister import Lister
+from cliff import lister
+from cliff import show
 from cliff import command
 from cliff.commandmanager import CommandManager
 
@@ -171,16 +172,37 @@ class SSHCommand(command.Command):
         self.log.debug('Run command(%s)', parsed_args)
         return super(SSHCommand, self).run(parsed_args)
 
+    def get_parser(self, prog_name):
+        parser = super(SSHCommand, self).get_parser(prog_name)
+        self.add_known_arguments(parser)
+        return parser
 
-class ListHostCommand(SSHCommand, Lister):
-    """Show a list of SSH Host in the ~/.ssh/config file.
+    def add_known_arguments(self, parser):
+        pass
+
+
+class CreateSSHKeyCommand(SSHCommand, show.ShowOne):
+    """Create SSH key pair
+    """
+    def add_known_arguments(self, parser):
+
+        parser.add_argument(
+            '--key-name',
+            default='id_rsa',
+            help='SSH Key name, default is id_rsa.')
+        parser.add_argument(
+            '--force',
+            type=bool,
+            help='whether overwrite the existing key.')
+
+    def take_action(self, parsed_args):
+        pass
+
+
+class ListHostCommand(SSHCommand, lister.Lister):
+    """List SSH Host in the ~/.ssh/config file.
     """
     list_columns = ['host', 'hostname', 'user', 'identityfile']
-
-    def get_parser(self, prog_name):
-        parser = super(ListHostCommand, self).get_parser(prog_name)
-        # TODO(xiaoquwl) add more prameters
-        return parser
 
     def take_action(self, parsed_args):
         ssh_config = SSHConfig().load()
@@ -194,7 +216,7 @@ class ListHostCommand(SSHCommand, Lister):
                 config['config'].get('identityfile')) for config in ssh_config[1:]))
 
 
-class ListKeyCommand(SSHCommand, Lister):
+class ListKeyCommand(SSHCommand, lister.Lister):
     """List the SSH keys in ~/.ssh/ folder
     """
     list_columns = ['Private Key Name', ]
@@ -210,14 +232,15 @@ class SSHApp(App):
     def __init__(self):
         command = CommandManager('sshapp.app')
         super(SSHApp, self).__init__(
-            description='Small and smart SSH configuration tool.',
+            description='Small but Smart SSH Configuration Tool.',
             version='0.1',
             command_manager=command,
             deferred_help=True,
             )
         commands = {
             'list-host': ListHostCommand,
-            'list-key': ListKeyCommand
+            'list-key': ListKeyCommand,
+            'create-key': CreateSSHKeyCommand
         }
         for k, v in commands.iteritems():
             command.add_command(k, v)
